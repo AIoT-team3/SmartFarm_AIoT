@@ -1,12 +1,3 @@
--- GreenTwin PostgreSQL 16 initial schema
--- Source: database-spec.md, 12 tables / 100 columns / 12 foreign keys.
--- Run once against an empty public schema with psql -X -v ON_ERROR_STOP=1 -f FILE.
--- Existing objects are never dropped or silently skipped.
--- UUIDs/request_id come from callers; timestamps and state transitions follow the API.
--- No seed rows: actual sowing date and device identities must be supplied separately.
--- CHECK constraints cover the specified DB rules; finite numbers and JSON contents
--- are additionally validated by the API as required by the specification.
-
 BEGIN;
 SET LOCAL search_path = public;
 SET LOCAL lock_timeout = '5s';
