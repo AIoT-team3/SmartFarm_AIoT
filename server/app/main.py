@@ -6,6 +6,7 @@ from app.errors import (
     api_error_handler,
     validation_error_handler,
 )
+from app.routers.overview import router as overview_router
 from app.routers.sensor import router as sensor_router
 
 
@@ -21,6 +22,7 @@ app.add_exception_handler(
 )
 
 app.include_router(sensor_router)
+app.include_router(overview_router)
 
 
 @app.get("/health")
