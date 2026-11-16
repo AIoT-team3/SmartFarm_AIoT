@@ -6,6 +6,7 @@ from app.errors import (
     api_error_handler,
     validation_error_handler,
 )
+from app.routers.actuations import router as actuations_router
 from app.routers.commands import router as commands_router
 from app.routers.devices import router as devices_router
 from app.routers.overview import router as overview_router
@@ -25,6 +26,7 @@ app.add_exception_handler(
 )
 
 app.include_router(sensor_router)
+app.include_router(actuations_router)
 app.include_router(overview_router)
 app.include_router(commands_router)
 app.include_router(devices_router)
