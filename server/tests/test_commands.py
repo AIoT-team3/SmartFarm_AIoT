@@ -2,17 +2,15 @@ import os
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from pathlib import Path
 from unittest.mock import patch
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
-from psycopg import sql
 from psycopg.types.json import Jsonb
 
-from app.database import get_connection
 from app.main import app
 from app import security
+from tests.postgres_case import PostgresIntegrationCase
 
 
 BASE = "/api/v1/commands"
@@ -23,25 +21,9 @@ FINISHED = "2026-11-16T17:00:00+09:00"
     os.getenv("RUN_COMMAND_DB_TESTS") == "1",
     "명령 통합 테스트를 실행하려면 RUN_COMMAND_DB_TESTS=1을 지정하세요.",
 )
-class CommandIntegrationTests(unittest.TestCase):
+class CommandIntegrationTests(PostgresIntegrationCase):
     def setUp(self):
-        self.schema = f"command_tests_{uuid4().hex}"
-        with get_connection() as conn:
-            conn.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(self.schema)))
-        self.addCleanup(self.drop_schema)
-
-        ddl = Path(__file__).resolve().parents[1] / "db" / "tables_setting.sql"
-        schema_sql = sql.Identifier(self.schema).as_string()
-        source = ddl.read_text()
-        expected = "SET LOCAL search_path = public;"
-        self.assertEqual(source.count(expected), 1, "테스트 스키마 지정 위치를 확인하세요.")
-        isolated_ddl = source.replace(expected, f"SET LOCAL search_path = {schema_sql};")
-        with self.connect() as conn:
-            conn.execute(isolated_ddl, prepare=False)
-            self.plant_id = conn.execute(
-                "INSERT INTO plant (name, species, sown_at) VALUES ('명령 테스트', 'test', now()) RETURNING id"
-            ).fetchone()[0]
-
+        super().setUp()
         self.enterContext(patch("app.services.commands.get_connection", self.connect))
         self.enterContext(patch.object(security, "DEVICE_UPLOAD_TOKEN", "test-device-token"))
         self.enterContext(patch.dict(os.environ, {
@@ -51,20 +33,6 @@ class CommandIntegrationTests(unittest.TestCase):
         self.client = self.enterContext(TestClient(app))
         self.dashboard = {"X-Command-Password": "test-command-password"}
         self.edge = {"Authorization": "Bearer test-device-token"}
-
-    def connect(self):
-        conn = get_connection()
-        try:
-            conn.execute(sql.SQL("SET search_path TO {}").format(sql.Identifier(self.schema)))
-            conn.commit()
-        except Exception:
-            conn.close()
-            raise
-        return conn
-
-    def drop_schema(self):
-        with get_connection() as conn:
-            conn.execute(sql.SQL("DROP SCHEMA {} CASCADE").format(sql.Identifier(self.schema)))
 
     def command_payload(self, kind, payload):
         return {
