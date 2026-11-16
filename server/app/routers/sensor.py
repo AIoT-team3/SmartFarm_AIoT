@@ -1,28 +1,11 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
 
-from app.errors import APIError
 from app.schemas.sensor import (
     SensorReadingsRequest,
     SensorReadingsResponse,
 )
-from app.security import verify_device_token
+from app.security import require_json, verify_device_token
 from app.services.sensor import save_sensor_readings
-
-
-def require_json(request: Request):
-    content_type = (
-        request.headers.get("content-type", "")
-        .split(";", 1)[0]
-        .strip()
-        .lower()
-    )
-
-    if content_type != "application/json":
-        raise APIError(
-            status_code=415,
-            code="UNSUPPORTED_MEDIA_TYPE",
-            message="Content-Type은 application/json이어야 합니다.",
-        )
 
 
 router = APIRouter(
