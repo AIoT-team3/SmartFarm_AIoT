@@ -7,7 +7,9 @@ from app.errors import (
     validation_error_handler,
 )
 from app.routers.commands import router as commands_router
+from app.routers.devices import router as devices_router
 from app.routers.overview import router as overview_router
+from app.routers.scans import router as scans_router
 from app.routers.sensor import router as sensor_router
 
 
@@ -25,6 +27,8 @@ app.add_exception_handler(
 app.include_router(sensor_router)
 app.include_router(overview_router)
 app.include_router(commands_router)
+app.include_router(devices_router)
+app.include_router(scans_router)
 
 
 @app.get("/health")

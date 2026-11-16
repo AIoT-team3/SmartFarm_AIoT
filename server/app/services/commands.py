@@ -9,6 +9,7 @@ from psycopg.types.json import Jsonb
 from app.database import get_connection
 from app.errors import APIError
 from app.schemas.commands import ClaimRequest, CommandRequest, ResultReport
+from app.services.device_settings import merge_reported_settings
 
 
 COMMAND_TTL_SECONDS = {"water": 120, "scan_now": 900}
@@ -173,45 +174,16 @@ def _sync_watering_settings(cur, command: dict, result: dict) -> str:
             [{"field": "result.applied_settings"}],
         )
 
-    cur.execute(
-        """
-        SELECT info, info->'applied_settings' = %s AS same_settings
-        FROM device
-        WHERE name = %s
-        FOR UPDATE
-        """,
-        (Jsonb(applied), device_name),
-    )
+    cur.execute("SELECT info FROM device WHERE name = %s FOR UPDATE", (device_name,))
     device = cur.fetchone()
     if device is None:
         raise APIError(404, "DEVICE_NOT_FOUND", "등록되지 않은 장비입니다.")
 
     info = device["info"] or {}
-    revision = result["settings_revision"]
-    current_revision = info.get("settings_revision")
-    applied_at = result["settings_applied_at"]
-    if current_revision is not None:
-        if revision < current_revision:
-            return "ignored_stale"
-        if revision == current_revision:
-            previous_time = info.get("settings_applied_at")
-            if (
-                device["same_settings"] and previous_time
-                and datetime.fromisoformat(previous_time) == datetime.fromisoformat(applied_at)
-            ):
-                return "duplicate"
-            raise APIError(
-                409, "SETTINGS_REVISION_CONFLICT", "같은 설정 버전에 다른 내용이 보고됐습니다.",
-                [{"field": "result.settings_revision"}],
-            )
-
-    info.update(
-        applied_settings=applied,
-        settings_revision=revision,
-        settings_applied_at=applied_at,
-    )
-    cur.execute("UPDATE device SET info = %s WHERE name = %s", (Jsonb(info), device_name))
-    return "updated"
+    status = merge_reported_settings(cur, info, result, {"field": "result.settings_revision"})
+    if status == "updated":
+        cur.execute("UPDATE device SET info = %s WHERE name = %s", (Jsonb(info), device_name))
+    return status
 
 
 def report_command_result(command_id: int, report: ResultReport) -> dict:
