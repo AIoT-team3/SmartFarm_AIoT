@@ -67,3 +67,13 @@ class SensorReadingResult(BaseModel):
 
 class SensorReadingsResponse(BaseModel):
     results: list[SensorReadingResult]
+
+
+class SensorValues(BaseModel):
+    air_temp_c: float | None
+    rh_pct: float | None
+    soil_moisture_pct: float | None
+    lux: float | None
+    ppfd: float | None
+    vpd_kpa: float | None
+    light_level: int | None

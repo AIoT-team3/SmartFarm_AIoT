@@ -96,9 +96,8 @@ class ScanImageDetail(BaseModel):
     h: int
 
 
-class ScanDetail(BaseModel):
+class ScanSummary(BaseModel):
     id: UUID
-    plant_id: int
     ts: AwareDatetime
     day: int
     status: ScanStatus
@@ -108,5 +107,23 @@ class ScanDetail(BaseModel):
     leaf_pairs_est: float | None
     leaf_area_est: float | None
     leaf_pairs_manual: int | None
+
+
+class ScanDetail(ScanSummary):
+    plant_id: int
     cloud_url: str | None
     images: list[ScanImageDetail]
+
+
+class ScanListItem(ScanSummary):
+    image_count: int
+
+
+class ScanListResponse(BaseModel):
+    plant_id: int
+    from_time: AwareDatetime = Field(alias="from")
+    to: AwareDatetime
+    items: list[ScanListItem]
+    limit: int
+    offset: int
+    next_offset: int | None
