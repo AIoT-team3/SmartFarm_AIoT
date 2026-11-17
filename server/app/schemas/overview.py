@@ -2,6 +2,8 @@ from typing import Any
 
 from pydantic import AwareDatetime, BaseModel, Field
 
+from app.schemas.sensor import SensorValues
+
 
 class PlantOverview(BaseModel):
     id: int
@@ -10,17 +12,10 @@ class PlantOverview(BaseModel):
     sown_at: AwareDatetime
 
 
-class LatestSensor(BaseModel):
+class LatestSensor(SensorValues):
     id: int
     ts: AwareDatetime
     age_seconds: int
-    air_temp_c: float | None
-    rh_pct: float | None
-    soil_moisture_pct: float | None
-    lux: float | None
-    ppfd: float | None
-    vpd_kpa: float | None
-    light_level: int | None
 
 
 class DeviceOverview(BaseModel):

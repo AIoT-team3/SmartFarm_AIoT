@@ -1,7 +1,7 @@
 import os
 import stat
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import BinaryIO
@@ -14,6 +14,7 @@ from psycopg.rows import dict_row
 from app.database import get_connection
 from app.errors import APIError
 from app.schemas.scans import FileKind, ScanRegistration, ScanStatus, ScanSubmission, SuccessfulSubmission
+from app.services.history_window import resolve_history_window
 from app.services.scan_files import (
     StagedScanFile,
     file_digest,
@@ -336,23 +337,7 @@ def list_scans(
     limit: int,
     offset: int,
 ) -> dict:
-    if from_time is None and to_time is None:
-        to_time = datetime.now(timezone.utc)
-        from_time = to_time - timedelta(days=1)
-    elif from_time is None or to_time is None:
-        missing = "from" if from_time is None else "to"
-        raise APIError(
-            422, "VALIDATION_ERROR", "from과 to는 함께 입력하세요.", [{"field": missing}],
-        )
-
-    if from_time >= to_time:
-        raise APIError(
-            422, "VALIDATION_ERROR", "from은 to보다 앞서야 합니다.", [{"field": "from"}],
-        )
-    if to_time - from_time > timedelta(days=31):
-        raise APIError(
-            422, "VALIDATION_ERROR", "한 번에 최대 31일까지 조회할 수 있습니다.", [{"field": "to"}],
-        )
+    from_time, to_time = resolve_history_window(from_time, to_time)
 
     with scan_cursor() as cur:
         cur.execute("SELECT 1 FROM plant WHERE id = %s", (plant_id,))
