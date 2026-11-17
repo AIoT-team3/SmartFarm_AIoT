@@ -205,3 +205,84 @@ class ScanIntegrationTests(PostgresIntegrationCase):
         with self.connect() as conn:
             self.assertEqual(conn.execute("SELECT count(*) FROM image").fetchone()[0], 0)
         self.assertEqual(self.upload(scan_id, "image", self.image_bytes()).status_code, 201)
+
+    def test_scan_detail_without_uploaded_files_and_failed_scan(self):
+        scan_id = self.register()["id"]
+        url = f"{BASE}/{scan_id}"
+        detail = self.client.get(url)
+        self.assertEqual(detail.status_code, 200, detail.text)
+        self.assertEqual(detail.json()["images"], [])
+        self.assertIsNone(detail.json()["cloud_url"])
+        self.assertIsNone(detail.json()["height_cm"])
+        self.assertEqual(detail.json()["status"], "pending")
+        self.assertEqual(self.client.get(f"{BASE}/invalid-uuid").status_code, 422)
+        missing = self.client.get(f"{BASE}/{uuid4()}")
+        self.assertEqual(missing.status_code, 404)
+        self.assertEqual(missing.json()["error"]["code"], "SCAN_NOT_FOUND")
+
+        self.submit(scan_id, {"outcome": "failed", "error": {"code": "CAMERA_TIMEOUT", "message": "촬영 실패"}})
+        failed = self.client.get(url)
+        self.assertEqual(failed.status_code, 200)
+        self.assertEqual(failed.json()["status"], "failed")
+
+    def test_scan_detail_urls_serve_uploaded_jpeg_png_and_ply(self):
+        scan_id = self.register()["id"]
+        jpeg = self.image_bytes(fmt="JPEG")
+        png = self.image_bytes("white")
+        other = self.upload(scan_id, "image", png, cam="cam1").json()
+        last_angle = self.upload(scan_id, "image", jpeg, cam="cam0", angle_idx="10").json()
+        original = self.upload(scan_id, "image", jpeg, cam="cam0", angle_idx="2").json()
+        mask = self.upload(scan_id, "mask", png, cam="cam0", angle_idx="2").json()
+        cloud = self.upload(scan_id, "cloud", PLY).json()
+        result = self.submit(scan_id, {
+            "outcome": "success", "cloud_uploaded": True, "height_cm": 12.4,
+            "images": [
+                {"cam": "cam0", "angle_idx": 2, "mask_uploaded": True},
+                {"cam": "cam0", "angle_idx": 10, "mask_uploaded": False},
+                {"cam": "cam1", "angle_idx": 0, "mask_uploaded": False},
+            ],
+        })
+        self.assertEqual(result.status_code, 202)
+        detail_response = self.client.get(f"{BASE}/{scan_id}")
+        self.assertEqual(detail_response.status_code, 200, detail_response.text)
+        detail = detail_response.json()
+        self.assertEqual(detail["status"], "processing")
+        self.assertEqual(detail["height_cm"], 12.4)
+        self.assertEqual(detail["cloud_url"], cloud["url"])
+        self.assertEqual(detail["images"], [
+            {"id": original["image_id"], "cam": "cam0", "angle_idx": 2, "url": original["url"], "mask_url": mask["url"], "w": 9, "h": 7},
+            {"id": last_angle["image_id"], "cam": "cam0", "angle_idx": 10, "url": last_angle["url"], "mask_url": None, "w": 9, "h": 7},
+            {"id": other["image_id"], "cam": "cam1", "angle_idx": 0, "url": other["url"], "mask_url": None, "w": 9, "h": 7},
+        ])
+        for url, content_type, expected in (
+            (detail["images"][0]["url"], "image/jpeg", jpeg),
+            (detail["images"][0]["mask_url"], "image/png", png),
+            (detail["images"][2]["url"], "image/png", png),
+            (detail["cloud_url"], "application/octet-stream", PLY),
+        ):
+            with self.subTest(url=url):
+                file = self.client.get(url)
+                self.assertEqual(file.status_code, 200)
+                self.assertEqual(file.headers["content-type"], content_type)
+                self.assertEqual(file.content, expected)
+
+    def test_file_delivery_rejects_unpublished_missing_and_outside_paths(self):
+        scan_id = self.register()["id"]
+        original = self.upload(scan_id, "image", self.image_bytes()).json()
+        path = self.root / original["url"].removeprefix("/files/")
+        unrelated = path.with_name("unlisted-0.png")
+        unrelated.write_bytes(b"unpublished file")
+        settings = self.root / ".env"
+        settings.write_text("test fixture")
+        self.assertEqual(
+            self.client.get(original["url"].replace(path.name, unrelated.name)).status_code, 404,
+        )
+        self.assertEqual(self.client.get("/files/.env").status_code, 404)
+        self.assertEqual(self.client.get(f"/files/scans/{scan_id}/images/%2e%2e/cloud.ply").status_code, 404)
+
+        path.unlink()
+        self.assertEqual(self.client.get(original["url"]).status_code, 404)
+        external = Path(self.enterContext(TemporaryDirectory())) / "outside.png"
+        external.write_bytes(b"outside storage")
+        path.symlink_to(external)
+        self.assertEqual(self.client.get(original["url"]).status_code, 404)
