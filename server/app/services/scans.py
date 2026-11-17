@@ -1,4 +1,5 @@
 import os
+import stat
 from contextlib import contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -16,6 +17,7 @@ from app.services.scan_files import (
     StagedScanFile,
     file_digest,
     scan_file_path,
+    scan_file_url,
     scan_storage_root,
     stage_scan_file,
 )
@@ -181,7 +183,7 @@ def _file_response(
         "angle_idx": angle_idx,
         "image_id": image_id,
         "status": status,
-        "url": f"/files/{path}",
+        "url": scan_file_url(path),
         "w": staged.width,
         "h": staged.height,
     }
@@ -240,3 +242,86 @@ def _validate_uploaded_files(cur, scan_id: UUID, cloud_file: str | None, submiss
         raise APIError(
             409, "FILES_INCOMPLETE", "제출한 사진·마스크·점군 목록과 실제 업로드 파일이 일치하지 않습니다.",
         )
+
+
+def get_scan_detail(scan_id: UUID) -> dict:
+    with scan_cursor() as cur:
+        cur.execute(
+            """
+            SELECT id, plant_id, ts, day, status, height_cm, canopy_cm, volume_cm3,
+                   leaf_pairs_est, leaf_area_est, leaf_pairs_manual, cloud_file
+            FROM scan
+            WHERE id = %s
+            """,
+            (scan_id,),
+        )
+        scan = cur.fetchone()
+        if scan is None:
+            raise APIError(404, "SCAN_NOT_FOUND", "등록되지 않은 스캔입니다.")
+
+        cur.execute(
+            """
+            SELECT id, cam, angle_idx, file, mask, w, h
+            FROM image
+            WHERE scan_id = %s
+            ORDER BY cam, angle_idx
+            """,
+            (scan_id,),
+        )
+        images = cur.fetchall()
+
+    cloud_file = scan.pop("cloud_file")
+    scan["cloud_url"] = scan_file_url(cloud_file) if cloud_file is not None else None
+    for image in images:
+        image["url"] = scan_file_url(image.pop("file"))
+        mask = image.pop("mask")
+        image["mask_url"] = scan_file_url(mask) if mask is not None else None
+    scan["images"] = images
+    return scan
+
+
+def get_published_scan_file(file_path: str) -> tuple[Path, str, os.stat_result]:
+    missing = APIError(404, "FILE_NOT_FOUND", "요청한 파일을 제공할 수 없습니다.")
+    parts = file_path.split("/")
+    if (
+        len(parts) not in (3, 4) or parts[0] != "scans"
+        or any(part in ("", ".", "..") for part in parts)
+        or "\\" in file_path or "\0" in file_path
+    ):
+        raise missing
+    try:
+        scan_id = UUID(parts[1])
+    except ValueError as exc:
+        raise missing from exc
+
+    if len(parts) == 3 and parts[2] == "cloud.ply":
+        media_type = "application/octet-stream"
+        query = "SELECT 1 FROM scan WHERE id = %s AND cloud_file = %s"
+    elif len(parts) == 4 and parts[2] == "images" and parts[3].endswith((".jpg", ".png")):
+        media_type = "image/jpeg" if parts[3].endswith(".jpg") else "image/png"
+        query = "SELECT 1 FROM image WHERE scan_id = %s AND file = %s"
+    elif len(parts) == 4 and parts[2] == "masks" and parts[3].endswith(".png"):
+        media_type = "image/png"
+        query = "SELECT 1 FROM image WHERE scan_id = %s AND mask = %s"
+    else:
+        raise missing
+
+    with scan_cursor() as cur:
+        cur.execute(query, (scan_id, file_path))
+        if cur.fetchone() is None:
+            raise missing
+
+    try:
+        root = scan_storage_root().resolve()
+        path = (root / file_path).resolve(strict=True)
+        if not path.is_relative_to(root):
+            raise missing
+        file_stat = path.stat()
+        if not stat.S_ISREG(file_stat.st_mode):
+            raise missing
+    except (FileNotFoundError, NotADirectoryError) as exc:
+        raise missing from exc
+    except OSError as exc:
+        raise APIError(503, "STORAGE_UNAVAILABLE", "스캔 파일 저장소에 접근할 수 없습니다.") from exc
+
+    return path, media_type, file_stat

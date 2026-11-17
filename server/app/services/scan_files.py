@@ -147,3 +147,7 @@ def _unsupported_format(kind: FileKind) -> APIError:
     return APIError(
         415, "UNSUPPORTED_MEDIA_TYPE", f"{supported[kind]} 파일만 지원합니다.", [{"field": "file"}],
     )
+
+
+def scan_file_url(relative_path: str) -> str:
+    return f"/files/{relative_path}"

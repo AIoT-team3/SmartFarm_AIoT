@@ -1,7 +1,7 @@
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StrictBool, field_validator
 
 from app.schemas.commands import PositiveId, ReportTimestamp
 from app.schemas.sensor import Number
@@ -84,3 +84,29 @@ class ScanSubmissionResponse(BaseModel):
     scan_id: UUID
     status: ScanStatus
     duplicate: bool
+
+
+class ScanImageDetail(BaseModel):
+    id: int
+    cam: str
+    angle_idx: int
+    url: str
+    mask_url: str | None
+    w: int
+    h: int
+
+
+class ScanDetail(BaseModel):
+    id: UUID
+    plant_id: int
+    ts: AwareDatetime
+    day: int
+    status: ScanStatus
+    height_cm: float | None
+    canopy_cm: float | None
+    volume_cm3: float | None
+    leaf_pairs_est: float | None
+    leaf_area_est: float | None
+    leaf_pairs_manual: int | None
+    cloud_url: str | None
+    images: list[ScanImageDetail]
