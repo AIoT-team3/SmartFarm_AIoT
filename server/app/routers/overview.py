@@ -1,13 +1,16 @@
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Path, Query
 from pydantic import BeforeValidator
 
 from app.schemas.actuations import ActuationHistory, ActuationKind, ActuationSource
 from app.schemas.commands import MAX_BIGINT, ReportTimestamp
+from app.schemas.growth import GrowthResponse
 from app.schemas.overview import OverviewResponse
 from app.schemas.sensor_history import SensorHistoryResponse, SensorInterval
 from app.services.actuations import get_actuation_history
+from app.services.growth import get_growth
 from app.services.overview import get_overview
 from app.services.sensor_history import get_sensor_history
 
@@ -83,3 +86,20 @@ def read_actuation_history(
     return get_actuation_history(
         plant_id, from_time, to, kind=kind, source=source, ok=ok, limit=limit, offset=offset,
     )
+
+
+@router.get(
+    "/{plant_id}/growth",
+    response_model=GrowthResponse,
+    summary="생장 예측 조회",
+    responses={
+        404: {"description": "등록되지 않은 화분, 모델 또는 스캔"},
+        422: {"description": "요청 형식, 모델 종류 또는 스캔 소속 오류"},
+    },
+)
+def read_growth(
+    plant_id: Annotated[int, Path(ge=1, le=MAX_BIGINT)],
+    model_id: Annotated[int | None, Query(ge=1, le=MAX_BIGINT)] = None,
+    origin_scan_id: Annotated[UUID | None, Query()] = None,
+):
+    return get_growth(plant_id, model_id, origin_scan_id)
