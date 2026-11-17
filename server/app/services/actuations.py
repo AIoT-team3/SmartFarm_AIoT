@@ -1,9 +1,13 @@
+from datetime import datetime
+
 import psycopg
+from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from app.database import get_connection
 from app.errors import APIError
-from app.schemas.actuations import ActuationItem, ActuationsRequest
+from app.schemas.actuations import ActuationItem, ActuationKind, ActuationsRequest, ActuationSource
+from app.services.history_window import resolve_history_window
 
 
 def save_actuations(payload: ActuationsRequest) -> dict:
@@ -79,3 +83,52 @@ def _save_actuation(cur, item: ActuationItem, index: int) -> str:
             [{"index": index, "field": "id"}],
         )
     return "duplicate"
+
+
+def get_actuation_history(
+    plant_id: int,
+    from_time: datetime | None,
+    to_time: datetime | None,
+    *,
+    kind: ActuationKind | None,
+    source: ActuationSource | None,
+    ok: bool | None,
+    limit: int,
+    offset: int,
+) -> dict:
+    start, end = resolve_history_window(from_time, to_time)
+    try:
+        with get_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT 1 FROM plant WHERE id = %s", (plant_id,))
+            if cur.fetchone() is None:
+                raise APIError(
+                    404, "PLANT_NOT_FOUND", "등록되지 않은 화분입니다.", [{"field": "plant_id"}],
+                )
+            cur.execute(
+                """
+                SELECT id, ts, kind, amount, unit, ok, reason, source, context
+                FROM actuation
+                WHERE plant_id = %s AND ts >= %s AND ts < %s
+                  AND (%s::text IS NULL OR kind = %s)
+                  AND (%s::text IS NULL OR source = %s)
+                  AND (%s::boolean IS NULL OR ok = %s)
+                ORDER BY ts DESC, id DESC
+                LIMIT %s OFFSET %s
+                """,
+                (plant_id, start, end, kind, kind, source, source, ok, ok, limit + 1, offset),
+            )
+            rows = cur.fetchall()
+    except psycopg.OperationalError as exc:
+        raise APIError(503, "STORAGE_UNAVAILABLE", "DB에 일시적으로 접근할 수 없습니다.") from exc
+    except psycopg.Error as exc:
+        raise APIError(500, "INTERNAL_SERVER_ERROR", "제어 이력 조회 중 오류가 발생했습니다.") from exc
+
+    return {
+        "plant_id": plant_id,
+        "from": start,
+        "to": end,
+        "items": rows[:limit],
+        "limit": limit,
+        "offset": offset,
+        "next_offset": offset + limit if len(rows) > limit else None,
+    }

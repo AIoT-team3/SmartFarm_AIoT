@@ -1,11 +1,15 @@
 import json
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StrictBool, model_validator
 
 from app.schemas.commands import Percentage, PositiveId, ReportTimestamp
 from app.schemas.sensor import Number
+
+
+ActuationKind = Literal["water", "light"]
+ActuationSource = Literal["auto", "manual", "guard"]
 
 
 class ActuationContext(BaseModel):
@@ -31,12 +35,12 @@ class ActuationItem(BaseModel):
     id: UUID
     plant_id: PositiveId
     ts: ReportTimestamp
-    kind: Literal["water", "light"]
+    kind: ActuationKind
     amount: Number | None = Field(default=None, ge=0)
     unit: str | None = Field(default=None, min_length=1, max_length=20)
     ok: StrictBool
     reason: str | None = None
-    source: Literal["auto", "manual", "guard"]
+    source: ActuationSource
     context: ActuationContext | None = None
 
     @model_validator(mode="after")
@@ -63,3 +67,25 @@ class ActuationResult(BaseModel):
 
 class ActuationsResponse(BaseModel):
     results: list[ActuationResult]
+
+
+class ActuationHistoryItem(BaseModel):
+    id: UUID
+    ts: AwareDatetime
+    kind: ActuationKind
+    amount: float | None
+    unit: str | None
+    ok: bool
+    reason: str | None
+    source: ActuationSource
+    context: dict[str, Any] | None
+
+
+class ActuationHistory(BaseModel):
+    plant_id: int
+    from_time: AwareDatetime = Field(alias="from")
+    to: AwareDatetime
+    items: list[ActuationHistoryItem]
+    limit: int
+    offset: int
+    next_offset: int | None
