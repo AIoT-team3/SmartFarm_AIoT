@@ -1,10 +1,13 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Path, Query
+from pydantic import BeforeValidator
 
+from app.schemas.actuations import ActuationHistory, ActuationKind, ActuationSource
 from app.schemas.commands import MAX_BIGINT, ReportTimestamp
 from app.schemas.overview import OverviewResponse
 from app.schemas.sensor_history import SensorHistoryResponse, SensorInterval
+from app.services.actuations import get_actuation_history
 from app.services.overview import get_overview
 from app.services.sensor_history import get_sensor_history
 
@@ -47,3 +50,36 @@ def read_sensor_history(
     offset: Annotated[int, Query(ge=0, le=MAX_BIGINT)] = 0,
 ):
     return get_sensor_history(plant_id, from_time, to, interval, limit, offset)
+
+
+def parse_ok_query(value: str) -> bool:
+    if value not in ("true", "false"):
+        raise ValueError("ok는 true 또는 false로 입력하세요.")
+    return value == "true"
+
+
+ActuationOkQuery = Annotated[bool, BeforeValidator(parse_ok_query)]
+
+
+@router.get(
+    "/{plant_id}/actuations",
+    response_model=ActuationHistory,
+    summary="제어 이력 조회",
+    responses={
+        404: {"description": "등록되지 않은 화분"},
+        422: {"description": "화분 ID, 기간, 필터 또는 페이지 범위 오류"},
+    },
+)
+def read_actuation_history(
+    plant_id: Annotated[int, Path(ge=1, le=MAX_BIGINT)],
+    from_time: Annotated[ReportTimestamp | None, Query(alias="from")] = None,
+    to: Annotated[ReportTimestamp | None, Query()] = None,
+    kind: Annotated[ActuationKind | None, Query()] = None,
+    source: Annotated[ActuationSource | None, Query()] = None,
+    ok: Annotated[ActuationOkQuery | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=1000)] = 100,
+    offset: Annotated[int, Query(ge=0, le=MAX_BIGINT)] = 0,
+):
+    return get_actuation_history(
+        plant_id, from_time, to, kind=kind, source=source, ok=ok, limit=limit, offset=offset,
+    )
