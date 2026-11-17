@@ -1,6 +1,7 @@
 import os
 import stat
 from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import BinaryIO
@@ -12,7 +13,7 @@ from psycopg.rows import dict_row
 
 from app.database import get_connection
 from app.errors import APIError
-from app.schemas.scans import FileKind, ScanRegistration, ScanSubmission, SuccessfulSubmission
+from app.schemas.scans import FileKind, ScanRegistration, ScanStatus, ScanSubmission, SuccessfulSubmission
 from app.services.scan_files import (
     StagedScanFile,
     file_digest,
@@ -325,3 +326,60 @@ def get_published_scan_file(file_path: str) -> tuple[Path, str, os.stat_result]:
         raise APIError(503, "STORAGE_UNAVAILABLE", "스캔 파일 저장소에 접근할 수 없습니다.") from exc
 
     return path, media_type, file_stat
+
+
+def list_scans(
+    plant_id: int,
+    from_time: datetime | None,
+    to_time: datetime | None,
+    status: ScanStatus | None,
+    limit: int,
+    offset: int,
+) -> dict:
+    if from_time is None and to_time is None:
+        to_time = datetime.now(timezone.utc)
+        from_time = to_time - timedelta(days=1)
+    elif from_time is None or to_time is None:
+        missing = "from" if from_time is None else "to"
+        raise APIError(
+            422, "VALIDATION_ERROR", "from과 to는 함께 입력하세요.", [{"field": missing}],
+        )
+
+    if from_time >= to_time:
+        raise APIError(
+            422, "VALIDATION_ERROR", "from은 to보다 앞서야 합니다.", [{"field": "from"}],
+        )
+    if to_time - from_time > timedelta(days=31):
+        raise APIError(
+            422, "VALIDATION_ERROR", "한 번에 최대 31일까지 조회할 수 있습니다.", [{"field": "to"}],
+        )
+
+    with scan_cursor() as cur:
+        cur.execute("SELECT 1 FROM plant WHERE id = %s", (plant_id,))
+        if cur.fetchone() is None:
+            raise APIError(404, "PLANT_NOT_FOUND", "등록되지 않은 화분입니다.", [{"field": "plant_id"}])
+
+        cur.execute(
+            """
+            SELECT scan.id, scan.ts, scan.day, scan.status, scan.height_cm, scan.canopy_cm,
+                   scan.volume_cm3, scan.leaf_pairs_est, scan.leaf_area_est, scan.leaf_pairs_manual,
+                   (SELECT count(*) FROM image WHERE image.scan_id = scan.id) AS image_count
+            FROM scan
+            WHERE scan.plant_id = %s AND scan.ts >= %s AND scan.ts < %s
+              AND (%s::text IS NULL OR scan.status = %s)
+            ORDER BY scan.ts DESC, scan.id DESC
+            LIMIT %s OFFSET %s
+            """,
+            (plant_id, from_time, to_time, status, status, limit + 1, offset),
+        )
+        rows = cur.fetchall()
+
+    return {
+        "plant_id": plant_id,
+        "from": from_time,
+        "to": to_time,
+        "items": rows[:limit],
+        "limit": limit,
+        "offset": offset,
+        "next_offset": offset + limit if len(rows) > limit else None,
+    }

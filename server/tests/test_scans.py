@@ -2,6 +2,7 @@ import hashlib
 import os
 import unittest
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -286,3 +287,101 @@ class ScanIntegrationTests(PostgresIntegrationCase):
         external.write_bytes(b"outside storage")
         path.symlink_to(external)
         self.assertEqual(self.client.get(original["url"]).status_code, 404)
+
+    def test_scan_list_filters_orders_counts_and_paginates(self):
+        start = "2026-12-01T00:00:00+09:00"
+        end = "2026-12-02T00:00:00+09:00"
+        boundary = "00000000-0000-4000-8000-000000000001"
+        older_tie = "00000000-0000-4000-8000-000000000002"
+        newer_tie = "00000000-0000-4000-8000-000000000003"
+        excluded_end = str(uuid4())
+        excluded_plant = str(uuid4())
+        with self.connect() as conn:
+            other_plant = conn.execute(
+                "INSERT INTO plant (name, species, sown_at) VALUES ('다른 화분', 'test', %s) RETURNING id",
+                (start,),
+            ).fetchone()[0]
+            with conn.cursor() as cur:
+                cur.executemany(
+                    "INSERT INTO scan (id, plant_id, ts, day, status) VALUES (%s, %s, %s, 1, %s)",
+                    [
+                        (boundary, self.plant_id, start, "failed"),
+                        (older_tie, self.plant_id, CAPTURED, "pending"),
+                        (newer_tie, self.plant_id, CAPTURED, "pending"),
+                        (excluded_end, self.plant_id, end, "completed"),
+                        (excluded_plant, other_plant, CAPTURED, "completed"),
+                    ],
+                )
+        self.assertEqual(self.upload(newer_tie, "image", self.image_bytes()).status_code, 201)
+        self.assertEqual(self.upload(newer_tie, "mask", self.image_bytes("white")).status_code, 201)
+        self.assertEqual(self.upload(newer_tie, "cloud", PLY).status_code, 201)
+        self.assertEqual(self.submit(newer_tie, {
+            "outcome": "success", "cloud_uploaded": True, "height_cm": 12.4,
+            "images": [{"cam": "cam0", "angle_idx": 0, "mask_uploaded": True}],
+        }).status_code, 202)
+        url = f"/api/v1/plants/{self.plant_id}/scans"
+
+        response = self.client.get(url, params={"from": start, "to": end, "limit": 2})
+        self.assertEqual(response.status_code, 200, response.text)
+        first = response.json()
+        self.assertEqual(first["plant_id"], self.plant_id)
+        self.assertEqual(datetime.fromisoformat(first["from"]), datetime.fromisoformat(start))
+        self.assertEqual(datetime.fromisoformat(first["to"]), datetime.fromisoformat(end))
+        self.assertEqual([item["id"] for item in first["items"]], [newer_tie, older_tie])
+        self.assertEqual([item["image_count"] for item in first["items"]], [1, 0])
+        self.assertEqual(first["items"][0]["height_cm"], 12.4)
+        self.assertIsNone(first["items"][1]["height_cm"])
+        self.assertEqual((first["limit"], first["offset"], first["next_offset"]), (2, 0, 2))
+
+        page = self.client.get(url, params={"from": first["from"], "to": first["to"], "limit": 2, "offset": first["next_offset"]}).json()
+        self.assertEqual([item["id"] for item in page["items"]], [boundary])
+        self.assertIsNone(page["next_offset"])
+        filtered = self.client.get(url, params={"from": start, "to": end, "status": "processing"}).json()
+        self.assertEqual([item["id"] for item in filtered["items"]], [newer_tie])
+        self.assertIsNone(filtered["next_offset"])
+
+    def test_scan_list_defaults_to_latest_24h_and_handles_empty_plant(self):
+        url = f"/api/v1/plants/{self.plant_id}/scans"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200, response.text)
+        default = response.json()
+        self.assertEqual(default["items"], [])
+        self.assertIsNone(default["next_offset"])
+        self.assertEqual((default["limit"], default["offset"]), (100, 0))
+        self.assertEqual(
+            datetime.fromisoformat(default["to"]) - datetime.fromisoformat(default["from"]),
+            timedelta(hours=24),
+        )
+
+        now = datetime.now(timezone.utc)
+        recent, old = str(uuid4()), str(uuid4())
+        with self.connect() as conn, conn.cursor() as cur:
+            cur.executemany(
+                "INSERT INTO scan (id, plant_id, ts, day) VALUES (%s, %s, %s, 1)",
+                [(recent, self.plant_id, now - timedelta(hours=1)), (old, self.plant_id, now - timedelta(hours=25))],
+            )
+        response = self.client.get(url)
+        self.assertEqual([item["id"] for item in response.json()["items"]], [recent])
+
+    def test_scan_list_validates_query_and_plant_id(self):
+        url = f"/api/v1/plants/{self.plant_id}/scans"
+        start = "2026-12-01T00:00:00+09:00"
+        for query in (
+            {"from": start},
+            {"to": start},
+            {"from": start, "to": start},
+            {"from": start, "to": "2027-01-02T00:00:00+09:00"},
+            {"from": "2026-12-01T00:00:00", "to": start},
+            {"status": "unknown"},
+            {"limit": 0},
+            {"limit": 1001},
+            {"offset": -1},
+        ):
+            with self.subTest(query=query):
+                response = self.client.get(url, params=query)
+                self.assertEqual(response.status_code, 422, response.text)
+                self.assertEqual(response.json()["error"]["code"], "VALIDATION_ERROR")
+        self.assertEqual(self.client.get("/api/v1/plants/0/scans").status_code, 422)
+        missing = self.client.get("/api/v1/plants/99999/scans")
+        self.assertEqual(missing.status_code, 404)
+        self.assertEqual(missing.json()["error"]["code"], "PLANT_NOT_FOUND")
