@@ -10,7 +10,7 @@ git switch dashboard
 git pull --ff-only origin dashboard
 ```
 
-팀원이 실행 중인 FastAPI에 연결해도 됩니다. 이 브랜치에는 프론트 코드가 있으므로 서버 주소를 공유받아 아래 환경 변수에 입력합니다.
+현재 실행 중인 FastAPI에 연결할 수 있습니다. 이 브랜치에는 프론트 코드가 있으므로 서버 주소를 공유받아 아래 환경 변수에 입력합니다.
 
 ```sh
 cd dashboard
@@ -54,5 +54,3 @@ npm run test:e2e
 ```
 
 미리보기는 `http://localhost:4173`에서 실행되며 같은 API 프록시를 사용합니다. `dist`를 다른 정적 서버에 배포하는 경우 `/api`, `/files`, `/health`를 FastAPI로 전달하도록 그 서버의 리버스 프록시도 설정합니다.
-
-브라우저 테스트는 설치된 Google Chrome을 사용하며 API 응답을 테스트용으로 대체합니다.
