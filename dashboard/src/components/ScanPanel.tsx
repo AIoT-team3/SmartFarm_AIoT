@@ -1,15 +1,9 @@
 import { useState } from "react";
-import {
-  Camera,
-  Download,
-  Image as ImageIcon,
-  Layers,
-  Maximize2,
-} from "lucide-react";
+import { Camera, Download, Maximize2 } from "lucide-react";
 import type { Scan, ScanDetail } from "../types";
 import { dateTime, number, statusLabel } from "../format";
 import { fileUrl } from "../api";
-import { Empty, ErrorNote, Metric, Modal } from "./UI";
+import { Empty, ErrorNote, Modal } from "./UI";
 
 export function ScanPanel({
   scans,
@@ -27,7 +21,6 @@ export function ScanPanel({
   onSelect: (id: string) => void;
 }) {
   const [camera, setCamera] = useState("all");
-  const [masks, setMasks] = useState(false);
   const [opened, setOpened] = useState<string | null>(null);
   const cameras = Array.from(
     new Set(detail?.images.map((item) => item.cam) || []),
@@ -69,24 +62,6 @@ export function ScanPanel({
         ) : (
           <>
             <div className="scan-tools">
-              <div className="segmented">
-                <button
-                  aria-pressed={!masks}
-                  className={!masks ? "selected" : ""}
-                  onClick={() => setMasks(false)}
-                >
-                  <ImageIcon size={14} />
-                  사진
-                </button>
-                <button
-                  aria-pressed={masks}
-                  className={masks ? "selected" : ""}
-                  onClick={() => setMasks(true)}
-                >
-                  <Layers size={14} />
-                  마스크
-                </button>
-              </div>
               <select
                 aria-label="카메라 필터"
                 value={activeCamera}
@@ -103,14 +78,14 @@ export function ScanPanel({
             {images.length ? (
               <div className="photo-grid">
                 {images.map((image) => {
-                  const url = fileUrl(masks ? image.mask_url : image.url);
+                  const url = fileUrl(image.url);
                   return (
                     <button
                       key={image.id}
                       className="photo"
                       disabled={!url}
                       onClick={() => setOpened(url)}
-                      aria-label={`${image.cam} 순번 ${image.angle_idx} ${masks ? "마스크" : "사진"} 확대`}
+                      aria-label={`${image.cam} 순번 ${image.angle_idx} 사진 확대`}
                     >
                       {url ? (
                         <img
@@ -126,7 +101,7 @@ export function ScanPanel({
                           }}
                         />
                       ) : (
-                        <span>마스크 없음</span>
+                        <span>사진 경로 없음</span>
                       )}
                       <span className="photo-caption">
                         {image.cam}
@@ -140,29 +115,6 @@ export function ScanPanel({
             ) : (
               <Empty title="업로드된 사진이 없어요" />
             )}
-            <div className="scan-metrics">
-              <Metric label="키" value={number(detail.height_cm)} unit="cm" />
-              <Metric
-                label="캐노피 폭"
-                value={number(detail.canopy_cm)}
-                unit="cm"
-              />
-              <Metric
-                label="잎 쌍"
-                value={number(detail.leaf_pairs_est)}
-                unit="쌍"
-              />
-              <Metric
-                label="잎 면적"
-                value={number(detail.leaf_area_est)}
-                unit="cm²"
-              />
-              <Metric
-                label="부피"
-                value={number(detail.volume_cm3)}
-                unit="cm³"
-              />
-            </div>
             {cloudUrl && (
               <a className="button secondary" href={cloudUrl} download>
                 <Download size={15} />

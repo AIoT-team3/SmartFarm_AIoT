@@ -66,28 +66,16 @@ export function GrowthView({
           표시돼요.
         </div>
       )}
-      <div className="two-columns">
-        <section className="card">
-          <div className="card-heading">
-            <div>
-              <h2>키</h2>
-              <p>cm · 스캔 관측과 예측 평균</p>
-            </div>
-            <ChartNoAxesCombined size={20} className="muted" />
+      <section className="card growth-height">
+        <div className="card-heading">
+          <div>
+            <h2>키</h2>
+            <p>cm · 스캔 관측과 예측 평균</p>
           </div>
-          <GrowthChart scans={scans} growth={growth} />
-        </section>
-        <section className="card">
-          <div className="card-heading">
-            <div>
-              <h2>잎 쌍</h2>
-              <p>마디마다 마주난 잎 한 쌍</p>
-            </div>
-            <Sprout size={20} className="muted" />
-          </div>
-          <GrowthChart scans={scans} growth={growth} pairs />
-        </section>
-      </div>
+          <ChartNoAxesCombined size={20} className="muted" />
+        </div>
+        <GrowthChart scans={scans} growth={growth} />
+      </section>
       <div className="two-columns lower-growth">
         <section className="card">
           <div className="card-heading">

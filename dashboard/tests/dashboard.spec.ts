@@ -177,15 +177,24 @@ test("조회 화면·사진·예측·환경 이력을 연결하고 모바일에�
     .getByRole("navigation")
     .getByRole("button", { name: "스캔", exact: true })
     .click();
+  await expect(page.locator(".scan-main .metric")).toHaveCount(0);
   await page.getByRole("button", { name: "cam0 순번 0 사진 확대" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.getByRole("button", { name: "닫기", exact: true }).click();
-  await page.getByRole("button", { name: "마스크", exact: true }).click();
-  await expect(page.getByText("마스크 없음")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "마스크", exact: true }),
+  ).toHaveCount(0);
   await page
     .getByRole("navigation")
     .getByRole("button", { name: "생장", exact: true })
     .click();
+  await expect(
+    page.getByRole("heading", { name: "잎 쌍", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "키", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".growth-chart")).toHaveCount(1);
   await expect(
     page.getByText("아직 기다리고 있어요", { exact: true }),
   ).toBeVisible();
@@ -194,6 +203,12 @@ test("조회 화면·사진·예측·환경 이력을 연결하고 모바일에�
     .getByRole("button", { name: "장비", exact: true })
     .click();
   await expect(page.getByText("온라인 보고", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "이번에 요청한 명령", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "장비에 적용된 설정", exact: true }),
+  ).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
   for (const name of ["지금", "생장", "환경", "스캔", "장비"]) {
     await page
