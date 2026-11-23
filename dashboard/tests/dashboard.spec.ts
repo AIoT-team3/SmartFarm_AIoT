@@ -160,6 +160,14 @@ test("조회 화면·사진·예측·환경 이력을 연결하고 모바일에�
   await page.goto("/");
   await expect(page.getByText("서버 연결됨")).toBeVisible();
   await expect(page.locator(".hero-reading")).toContainText("17.1");
+  await expect(
+    page.locator(".today-summary").getByText("잎 쌍", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.locator(".today-summary").getByText("캐노피 폭", { exact: true }),
+  ).toHaveCount(0);
+  await expect(page.locator(".summary-metrics .metric")).toHaveCount(1);
+
   await expect(page.getByText("임시 3D 시각화")).toBeVisible();
   await page.getByRole("slider").fill("1");
   await expect(page.locator(".hero-reading")).toContainText("18.3");

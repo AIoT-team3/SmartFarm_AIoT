@@ -148,7 +148,6 @@ export function ScanPanel({
                 <span>
                   <strong>
                     키 {number(scan.height_cm)} <small>cm</small>
-                    <i>·</i>잎 {number(scan.leaf_pairs_est)} <small>쌍</small>
                   </strong>
                   <span>
                     D+{scan.day} · {statusLabel(scan.status)} ·{" "}
