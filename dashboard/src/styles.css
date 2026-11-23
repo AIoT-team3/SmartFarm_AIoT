@@ -592,7 +592,7 @@ main {
 }
 .summary-metrics {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr;
   margin-top: 24px;
   padding: 17px 0;
   border-top: 1px solid #e9ede5;

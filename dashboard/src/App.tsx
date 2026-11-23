@@ -154,7 +154,6 @@ export default function App() {
         day: scan.day,
         ts: scan.ts,
         height: scan.height_cm,
-        pairs: scan.leaf_pairs_est,
         scan,
         prediction: null as Prediction | null,
       }));
@@ -163,7 +162,6 @@ export default function App() {
       day: prediction.target_day,
       ts: prediction.target_date,
       height: prediction.height_mu,
-      pairs: prediction.pairs_mu,
       scan: null as Scan | null,
       prediction,
     }));
@@ -493,16 +491,6 @@ export default function App() {
                       : "스캔 측정값이 도착하면 표시돼요"}
                 </p>
                 <div className="summary-metrics">
-                  <Metric
-                    label="잎 쌍"
-                    value={number(chosen?.pairs)}
-                    unit="쌍"
-                  />
-                  <Metric
-                    label="캐노피 폭"
-                    value={number(chosen?.scan?.canopy_cm)}
-                    unit="cm"
-                  />
                   <Metric
                     label="수확 예상"
                     value={
