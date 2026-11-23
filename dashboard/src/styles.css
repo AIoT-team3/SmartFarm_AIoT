@@ -753,6 +753,9 @@ main {
   color: #8b9c7e;
   font-size: 10px;
 }
+.growth-height {
+  margin-bottom: 24px;
+}
 .two-columns {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1006,7 +1009,7 @@ tr:last-child td {
 }
 .scan-tools {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   margin: 20px 0 15px;
   gap: 12px;
@@ -1080,18 +1083,6 @@ select {
   content: "파일을 열 수 없어요";
   color: #9caa90;
   font-size: 11px;
-}
-.scan-metrics {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-bottom: 22px;
-}
-.scan-metrics .metric {
-  border: 1px solid #edf0e7;
-  background: #f7faf3;
-  border-radius: 11px;
-  padding: 14px;
 }
 .scan-history {
   padding: 23px 16px;
@@ -1190,36 +1181,6 @@ select {
 .device-card dl {
   padding-top: 20px;
   border-top: 1px solid #e9eee3;
-}
-.command-panel {
-  margin-bottom: 24px;
-}
-.command-detail > div {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.command-detail strong {
-  font-size: 16px;
-}
-.command-detail p {
-  font-size: 12px;
-  color: #95a286;
-  margin-top: 11px;
-}
-.applied-settings p {
-  font-size: 12px;
-  color: #9da98f;
-  margin: 9px 0 20px;
-}
-.applied-settings pre {
-  font-size: 12px;
-  background: #f6f9f1;
-  padding: 20px;
-  border-radius: 10px;
-  overflow: auto;
-  color: #6c815b;
-  line-height: 1.8;
 }
 .full-width {
   width: 100%;
@@ -1823,13 +1784,6 @@ footer > span:first-child {
   .score-row > div:first-child > strong {
     font-size: 37px;
   }
-  .scan-tools .segmented button {
-    font-size: 11px;
-    padding: 7px 10px;
-  }
-  .scan-metrics {
-    grid-template-columns: repeat(2, 1fr);
-  }
   .photo-grid {
     grid-template-columns: repeat(3, 1fr);
     gap: 7px;
@@ -1914,8 +1868,6 @@ footer > span:first-child {
 .settings-summary dl,
 .settings-summary dd,
 .settings-summary p,
-.command-detail p,
-.applied-settings p,
 .config-note p {
   font-size: 12px;
 }

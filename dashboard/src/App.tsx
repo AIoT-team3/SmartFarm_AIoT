@@ -1,6 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import {
-  Activity,
   ArrowUpRight,
   Camera,
   Check,
@@ -381,11 +380,9 @@ export default function App() {
                 ? ` · ${command.result.message}`
                 : ""}
             </span>
-            <button className="text-button" onClick={() => setTab("devices")}>
-              처리 상태 확인 <ChevronRight size={14} />
-            </button>
           </div>
         )}
+        <ErrorNote message={commandNotice ? commandResult.error : null} />
         {tab === "today" && (
           <>
             <div className="section-title-row today-title">
@@ -651,7 +648,7 @@ export default function App() {
             <div className="section-title-row">
               <div>
                 <h1>작은 재배실의 연결 상태</h1>
-                <p>장비가 마지막으로 보고한 상태와 요청한 명령을 확인해요.</p>
+                <p>장비가 마지막으로 보고한 연결 상태를 확인해요.</p>
               </div>
               <span className="soft-pill">
                 <ShieldCheck size={14} />
@@ -704,58 +701,6 @@ export default function App() {
                 </section>
               )}
             </div>
-            <section className="card command-panel">
-              <div className="card-heading">
-                <div>
-                  <span className="eyebrow">COMMAND STATUS</span>
-                  <h2>이번에 요청한 명령</h2>
-                </div>
-                <Activity size={20} className="muted" />
-              </div>
-              <ErrorNote message={commandResult.error} />
-              {command ? (
-                <div className="command-detail">
-                  <div>
-                    <strong>
-                      {command.kind === "scan_now" ? "지금 스캔" : "비상정지"}{" "}
-                      <span className="muted">#{command.id}</span>
-                    </strong>
-                    <span
-                      className={`status-pill ${command.status === "done" ? "success" : command.status === "failed" ? "danger" : ""}`}
-                    >
-                      {statusLabel(command.status)}
-                    </span>
-                  </div>
-                  <p>
-                    요청 {dateTime(command.created_at, true)}
-                    {command.done_at
-                      ? ` · 완료 ${dateTime(command.done_at, true)}`
-                      : " · 장비의 결과 보고를 기다리고 있어요."}
-                  </p>
-                  {typeof command.result?.message === "string" && (
-                    <p>{command.result.message}</p>
-                  )}
-                </div>
-              ) : (
-                <Empty
-                  title="이번 접속에서 요청한 명령이 없어요"
-                  detail="지금 스캔이나 비상정지를 요청하면 처리 상태를 확인할 수 있어요."
-                />
-              )}
-            </section>
-            {record?.settings && (
-              <section className="card applied-settings">
-                <h2>장비에 적용된 설정</h2>
-                <p>
-                  {record.settings.device_name} · v
-                  {record.settings.settings_revision} ·{" "}
-                  {dateTime(record.settings.settings_applied_at, true)}
-                </p>
-                <pre>
-                  {JSON.stringify(record.settings.applied_settings, null, 2)}
-                </pre>
-              </section>
-            )}
           </>
         )}
         {tab === "environment" && sensors.data?.length ? (
