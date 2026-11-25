@@ -159,6 +159,8 @@ test("조회 화면·사진·예측·환경 이력을 연결하고 모바일에�
   await api(page);
   await page.goto("/");
   await expect(page.getByText("서버 연결됨")).toBeVisible();
+  await expect(page.getByRole("banner").getByRole("button", { name: "지금 스캔", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("banner").getByRole("button", { name: "비상정지", exact: true })).toHaveCount(0);
   await expect(page.locator(".hero-reading")).toContainText("17.1");
   await expect(
     page.locator(".today-summary").getByText("잎 쌍", { exact: true }),
@@ -177,8 +179,11 @@ test("조회 화면·사진·예측·환경 이력을 연결하고 모바일에�
     .getByRole("button", { name: "환경", exact: true })
     .click();
   await expect(page.locator(".large-reading").first()).toContainText("24.3");
+  await expect(page.getByRole("columnheader", { name: "사유", exact: true })).toHaveCount(0);
+  await expect(page.getByText("온습도 기록을 표로 보기", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".history-layout thead th")).toHaveCount(5);
   await expect(
-    page.getByRole("cell", { name: "자동 급수", exact: true }),
+    page.getByRole("cell", { name: "급수", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "7일", exact: true }).click();
   await page
@@ -301,6 +306,7 @@ test("명령 실패 재시도에 같은 UUID를 사용하고 장비 보고 후 �
     route.fulfill({ json: result }),
   );
   await page.goto("/");
+  await page.getByRole("navigation").getByRole("button", { name: "스캔", exact: true }).click();
   await page.getByRole("button", { name: "지금 스캔", exact: true }).click();
   await page.getByLabel("명령 비밀번호").fill("test-only");
   await page.getByRole("button", { name: "스캔 요청 보내기" }).click();
@@ -313,4 +319,17 @@ test("명령 실패 재시도에 같은 UUID를 사용하고 장비 보고 후 �
   expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain(
     "test-only",
   );
+});
+
+test("25cm 수확 기준을 충족하면 현재 수확 가능 상태를 표시한다", async ({ page }) => {
+  await api(page);
+  await page.route("**/api/v1/plants/1/growth", (route) => route.fulfill({ json: {
+    ...growth,
+    harvest: { status: "available", estimated_date: "2026-11-24", remaining_days: 0 },
+  } }));
+  await page.goto("/");
+  await expect(page.locator(".summary-metrics")).toContainText("지금 가능");
+  await expect(page.locator(".summary-metrics")).toContainText("25cm");
+  await page.getByRole("navigation").getByRole("button", { name: "생장", exact: true }).click();
+  await expect(page.getByText("키 25cm 기준을 충족해 수확할 수 있어요.", { exact: true })).toBeVisible();
 });

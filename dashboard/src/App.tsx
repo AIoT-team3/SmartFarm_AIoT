@@ -94,7 +94,6 @@ export default function App() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [command, setCommand] = useState<Command | null>(null);
   const [commandNotice, setCommandNotice] = useState(false);
-  const [showReadings, setShowReadings] = useState(false);
   const base = `/api/v1/plants/${plantId}`;
   const overview = useResource<Overview>(
     `${base}/overview:${version}`,
@@ -285,20 +284,6 @@ export default function App() {
                 ? "서버 연결됨"
                 : "연결 확인"}
           </span>
-          <button
-            className="button primary"
-            onClick={() => openAction("scan_now")}
-          >
-            <ScanLine size={15} />
-            지금 스캔
-          </button>
-          <button
-            className="button stop-button"
-            onClick={() => openAction("estop")}
-          >
-            <CircleStop size={15} />
-            비상정지
-          </button>
           <button
             className="icon-button"
             aria-label="연결 설정"
@@ -495,9 +480,14 @@ export default function App() {
                     label="수확 예상"
                     value={
                       growth.data?.harvest.status === "available"
-                        ? dateTime(growth.data.harvest.estimated_date)
-                        : "준비 중"
+                        ? growth.data.harvest.remaining_days === 0
+                          ? "지금 가능"
+                          : dateTime(growth.data.harvest.estimated_date)
+                        : growth.data?.harvest.status === "not_reached"
+                          ? "아직 미도달"
+                          : "준비 중"
                     }
+                    note="키 25cm 이상 기준"
                   />
                 </div>
                 <div className="summary-section-heading">
@@ -691,37 +681,6 @@ export default function App() {
             </div>
           </>
         )}
-        {tab === "environment" && sensors.data?.length ? (
-          <details
-            className="readings-details"
-            open={showReadings}
-            onToggle={(event) => setShowReadings(event.currentTarget.open)}
-          >
-            <summary>온습도 기록을 표로 보기</summary>
-            <div className="table-wrap card">
-              <table>
-                <thead>
-                  <tr>
-                    <th>시각</th>
-                    <th>기온</th>
-                    <th>습도</th>
-                    <th>표본 수</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sensors.data.map((item) => (
-                    <tr key={item.ts}>
-                      <td>{dateTime(item.ts, true)}</td>
-                      <td>{number(item.air_temp_c)} °C</td>
-                      <td>{number(item.rh_pct)} %</td>
-                      <td>{item.sample_count ?? "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </details>
-        ) : null}
       </main>
       <footer>
         <span>
