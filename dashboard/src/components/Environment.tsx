@@ -126,7 +126,6 @@ export function Environment({
                     <th>수행량</th>
                     <th>실행 주체</th>
                     <th>결과</th>
-                    <th>사유</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -167,7 +166,6 @@ export function Environment({
                           {item.ok ? "성공" : "실패"}
                         </span>
                       </td>
-                      <td className="reason-cell">{item.reason || "—"}</td>
                     </tr>
                   ))}
                 </tbody>
