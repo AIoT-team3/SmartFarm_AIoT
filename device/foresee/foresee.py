@@ -24,11 +24,16 @@ from pathlib import Path
 
 import numpy as np
 
+from watering import forecast as watering_forecast
+
 E = os.environ.get
 DATA = Path(E("DATA", "data")).resolve()
 SOWN = E("SOWN", "")
 PLANT = E("PLANT", "basil")
 MODEL = Path(E("MODEL", str(Path(__file__).with_name("model.json"))))
+WATER_MODEL = Path(E("WATER_MODEL", str(Path(__file__).with_name("watering_model.json"))))
+WATER_THRESHOLD = float(E("WATER_THRESHOLD") or 1000)    # 급수가 필요한 VPD 누적 (kPa·min) — docs/watering-forecast-design.md
+WATER_ML = float(E("WATER_ML") or 25)                     # 한 번 급수량 (mL)
 PLANTS = {
     # 처음에 믿는 값이다. 스캔이 쌓이면 우리 화분에 맞춰지므로 어림값이어도 된다.
     #   이름 · 수확할 키 · 다 자란 키 (cm) · 하루 생장률 (가장 좋은 온도 · 조명 16시간 · 키 8 cm 일 때)
@@ -401,6 +406,16 @@ def main():
         write_ply(out / f"plant_d{c['day']:03d}.ply", *SHAPES[PLANT](max(0.5, c["p50"]), step=0.15, seed=7))
         plys.append({"day": c["day"], "date": c["date"], "height_cm": c["p50"], "file": f"plant_d{c['day']:03d}.ply"})
 
+    # 7) 급수 시점: 마지막 급수 뒤 VPD 누적이 기준치에 닿는 때 (식물이 클수록 빨리 쌓인다 — 키는 위의 예측에서)
+    grown_days = sorted([(r["day"], r["height_cm"]) for r in scans] + [(c["day"], c["p50"]) for c in curve]) if scans else []
+
+    def height_at(ts):
+        if not grown_days:
+            return None
+        return float(np.interp((ts - sown).total_seconds() / 86400, [d for d, _ in grown_days], [h for _, h in grown_days]))
+
+    watering = watering_forecast(DATA, now, height_at, WATER_THRESHOLD, WATER_ML, WATER_MODEL)
+
     doc = {"made_at": now.isoformat(timespec="seconds"), "plant": PLANT, "plant_name": NAME, "sown": SOWN, "today": round(today, 2),
            "observed": [{"day": r["day"], "ts": r["ts"], "height_cm": r["height_cm"], "suspect": bool(r.get("suspect"))} for r in scans],
            "curve": curve[:now_i + 29], "harvest": harvest,
@@ -408,10 +423,11 @@ def main():
            "personal": personal, "skill": skill, "checks": checks[-40:],
            "env": {**{k: round(v, 1) for k, v in usual.items()}, "days_logged": len(env),
                    "text": f"앞날은 기온 {usual['temp_c']:.1f} °C · 습도 {usual['rh_pct']:.0f} % · 조명 {usual['light_h']:.0f}시간 · 물 하루 {usual['water_ml']:.0f} mL 로 봤어요"},
-           "what_if": what_if, "plys": plys, "notes": notes}
+           "what_if": what_if, "plys": plys, "notes": notes, "watering": watering}
     (out / "forecast.json").write_text(json.dumps(doc, ensure_ascii=False, indent=1))
     print(json.dumps({"ok": True, "json": str(out / "forecast.json"), "plant": PLANT, "harvest": harvest, "speed_cm_per_day": personal["speed_cm_per_day"],
-                      "pace": personal["pace"], "trained": bool(model), "skill": skill and skill["text"], "notes": notes}, ensure_ascii=False))
+                      "pace": personal["pace"], "trained": bool(model), "skill": skill and skill["text"], "notes": notes,
+                      "watering": {k: watering[k] for k in ("hours_left", "method", "plan")}}, ensure_ascii=False))
 
 
 SHAPES = {"basil": basil, "greenonion": greenonion}
