@@ -1,0 +1,6 @@
+# 윈도우에서 받아도 줄 끝을 LF 로 둔다 (CRLF 가 되면 .sh 가 돌지 않는다)
+* text=auto eol=lf
+*.jpg binary
+*.png binary
+*.ply binary
+*.zip binary

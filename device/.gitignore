@@ -1,0 +1,10 @@
+data/
+db/token
+.venv/
+test/data/
+test/pi-data/
+test/*.log
+test/tank-empty
+__pycache__/
+.DS_Store
+.lgd-nfy*
