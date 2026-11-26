@@ -71,6 +71,7 @@ def main():
         alert("info", "no_sensor", f"온습도 값이 없어요 ({(climate or {}).get('error') or '센서 확인'})")
 
     # 급수
+    db = (pi1 or {}).get("db")
     if water:
         if water["stopped"]:
             alert("critical", "stopped", "비상정지 중이에요 — 급수가 막혀 있어요 (water.sh resume)")
@@ -78,9 +79,8 @@ def main():
             alert("serious", "tank_empty", "물통이 비었어요")
         if not water["flow_ml_s"]:
             alert("info", "no_flow", "펌프 유량을 아직 안 쟀어요 (water.sh sec 3 → water.sh flow <mL/초>)")
-        elif not water["times"]:
-            alert("info", "no_schedule", "자동 급수가 꺼져 있어요 (water.sh schedule 09:00 25)")
-    db = (pi1 or {}).get("db")
+        elif not water["times"] and not (db and db.get("url")):     # 서버에 이어져 있으면 서버의 급수 예측이 물을 준다
+            alert("info", "no_schedule", "자동 급수가 꺼져 있어요 — 서버 없이 돌린다면 water.sh schedule 09:00 25")
     if db and db.get("url") and db.get("error"):
         alert("info", "db", f"DB 로 올리지 못하고 있어요 — {db['error']}")
 

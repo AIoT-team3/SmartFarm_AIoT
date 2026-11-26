@@ -3,7 +3,9 @@
 
   맥북이 HTTP 로 시키면 한다   사진 찍기 · 회전판 돌리기 · 조명/팬/펌프 켜고 끄기 · 온습도 읽기
   혼자서도 한다 (Pi ① 만)      2초마다 지금 상태를 보고: 조명 시간표 · 더우면 조명 끄기 · 습하거나 더우면 팬 ·
-                              정해 둔 시각의 급수 · 덥고 건조하면 물 한 번 더.  10분마다: 온습도 기록
+                              정해 둔 시각의 급수(쓸 때만) · 24시간 동안 급수가 없으면 비상 급수 ·
+                              덥고 건조하면 물 한 번 더(DRY_EXTRA=1 일 때만).  10분마다: 온습도 기록
+                              평소의 급수 시점은 서버의 급수 예측(hub)이 water 명령으로 정한다 (docs/watering-forecast-design.md)
   서버와 잇기 (pi/link.py)   온습도는 MQTT, 급수 · 조명 · 팬 · 스캔은 HTTP 로 팀 서버에 올리고, 대시보드 명령을 받아 한다
   → 맥북이 꺼져 있어도 화분은 돌봄을 받고, 기록은 DB 에 쌓인다
 
@@ -48,6 +50,9 @@ MAX_DOSE_ML, MAX_DAY_ML = 60, 300       # 물: 한 번 최대 · 하루 최대
 FAN_RH, FAN_T = 70, 28                  # 습도 · 기온이 이 이상이면 팬을 켠다 (각각 65 % · 27 °C 아래로 내려가면 끈다)
 HEAT_OFF, HEAT_BACK = 32, 30            # 이 기온이면 조명을 끄고, 이 아래로 식으면 다시 시간표대로
 DRY_T, DRY_RH = 30, 40                  # 이만큼 덥고 건조하면 물을 한 번 더 준다 (하루 한 번, 마지막 급수 뒤 3시간이 지났을 때만)
+DRY_EXTRA_DEFAULT = False               # 급수 시점은 서버의 급수 예측(hub)이 정한다 — 겹치지 않게 '한 번 더' 는 기본으로 끈다
+DRY_EXTRA = E("DRY_EXTRA", "1" if DRY_EXTRA_DEFAULT else "0") == "1"     # 서버 없이 혼자 돌릴 때는 pi.env 에 DRY_EXTRA=1
+FALLBACK_H = 24                         # 이만큼 물을 한 번도 안 줬으면 (서버가 멈췄을 때) Pi 가 한 번 준다
 
 # 맥북에서 바꾸는 설정 (state.json 에 저장되어 다시 켜도 남는다)
 S = {"light": "auto", "start": "06:00", "hours": 16.0, "fan": "auto", "times": [], "each": 25.0, "flow": 0.0,
@@ -139,6 +144,8 @@ def water(ml=None, sec=None, by="manual"):
         ran = time.time() - t0
         LOCK["pump"].release()
     S["last"] = {"ts": iso(), "ml": round(ran * S["flow"], 1), "sec": round(ran, 2), "by": by}
+    if by != "test":                                            # 유량을 재느라 컵에 받은 물은 화분에 준 것이 아니다
+        S["last_given"] = S["last"]["ts"]
     S["today_ml"] = round(S["today_ml"] + S["last"]["ml"], 1)
     save()
     log("water", S["last"])
@@ -308,12 +315,13 @@ def tick():
             LOGGED_AT = time.time()
             log("climate", {"ts": iso(t), "temp_c": T, "rh_pct": RH, "light": int(ON["light"]), "fan": int(ON["fan"])})
         due = [x for x in S["times"] if x not in S["done"] and 0 <= minutes_past(t, x) < 60]
-        since = (t - datetime.fromisoformat(S["last"]["ts"])).total_seconds() / 3600 if S["last"] else 99
-        dry = bool(T is not None and RH is not None and T >= DRY_T and RH <= DRY_RH and S["flow"] and not S["stopped"]
-                   and not due and since >= 3 and S.get("extra_day") != S["day"])
-        if due or dry:
+        if not S.get("watch_from"):                             # 비상 급수 시계: 물을 한 번도 안 줬으면 처음 켠 때부터 센다
+            S["watch_from"] = iso(t)
+            save()
+        extra = extra_watering(t, T, RH, due)
+        if due or extra:
             S["done"] += due
-            if dry:
+            if extra == "dry":
                 S["extra_day"] = S["day"]
             save()
     for _ in due:                                               # 자동 급수 (1시간 넘게 늦었으면 건너뛴다)
@@ -321,12 +329,29 @@ def tick():
             water(ml=S["each"], by="schedule")
         except Oops as e:
             log("water", {"ts": iso(), "ml": 0, "by": "schedule", "skipped": str(e)})
-    if dry:
+    if extra:
+        by = "auto" if extra == "dry" else "fallback"
         try:
-            dose = water(ml=S["each"], by="auto")
-            did("water", f"물: 덥고 건조해서 {dose['ml']:g} mL 를 한 번 더 줬어요 ({T:g} °C · {RH:g} %)")
+            dose = water(ml=S["each"], by=by)
+            did("water", f"물: 덥고 건조해서 {dose['ml']:g} mL 를 한 번 더 줬어요 ({T:g} °C · {RH:g} %)" if extra == "dry"
+                else f"물: {FALLBACK_H}시간 동안 급수가 없어 {dose['ml']:g} mL 를 줬어요 (비상 급수 — 서버의 급수 예측을 확인하세요)")
         except Oops as e:
-            log("water", {"ts": iso(), "ml": 0, "by": "auto", "skipped": str(e)})
+            log("water", {"ts": iso(), "ml": 0, "by": by, "skipped": str(e)})
+
+
+def extra_watering(t, T, RH, due):
+    """시간표 밖의 급수 → 'fallback' (FALLBACK_H 동안 물을 안 줌 — 서버가 멈췄을 때) · 'dry' (덥고 건조, DRY_EXTRA 일 때만) · None.
+    평소의 급수 시점은 서버의 급수 예측(hub)이 water 명령으로 정한다."""
+    if not S["flow"] or S["stopped"] or due:
+        return None
+    ref = S.get("last_given") or S.get("watch_from")
+    if ref and (t - datetime.fromisoformat(ref)).total_seconds() / 3600 >= FALLBACK_H:
+        return "fallback"
+    since = (t - datetime.fromisoformat(S["last"]["ts"])).total_seconds() / 3600 if S["last"] else 99
+    if (DRY_EXTRA and T is not None and RH is not None and T >= DRY_T and RH <= DRY_RH
+            and since >= 3 and S.get("extra_day") != S["day"]):
+        return "dry"
+    return None
 
 
 def minutes_past(t, hhmm):

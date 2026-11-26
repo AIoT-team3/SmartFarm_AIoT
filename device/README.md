@@ -39,8 +39,10 @@
 | 기온 32 °C 이상 | 조명 끄기 (30 °C 아래로 식으면 다시 시간표대로) |
 | 습도 70 % 이상 · 기온 28 °C 이상 | 팬 켜기 (65 % · 27 °C 아래로 내려가면 끄기) |
 | 매시 정각부터 10분 | 팬으로 환기 (18 °C 보다 추우면 쉰다) |
-| 정해 둔 급수 시각 | 정해 둔 양만큼 물 주기 |
-| 기온 30 °C 이상이고 습도 40 % 이하 | 물 한 번 더 (하루 한 번, 마지막 급수 뒤 3시간이 지났을 때만) |
+| 서버의 급수 예측(hub)이 `water` 명령을 보낼 때 | 그 양만큼 물 주기 — **평소의 급수는 이것** (`docs/watering-forecast-design.md`) |
+| 24시간 동안 물을 한 번도 안 줬을 때 | 비상 급수 25 mL 한 번 (서버가 멈췄을 때를 위한 것. 처음 켰으면 켠 때부터 센다) |
+| 정해 둔 급수 시각 (`water.sh schedule`, 기본 꺼짐) | 정해 둔 양만큼 물 주기 — 서버 없이 돌릴 때만 쓴다 |
+| 기온 30 °C 이상이고 습도 40 % 이하 (`pi.env` 의 `DRY_EXTRA=1` 일 때만, 기본 꺼짐) | 물 한 번 더 (하루 한 번, 마지막 급수 뒤 3시간이 지났을 때만) |
 | 10분마다 | 온습도 기록 (1분마다 서버로: 온습도는 MQTT, 나머지는 HTTP) |
 | 10초마다 | 대시보드 명령 받아 오기 (물 · 지금 스캔 · 비상정지) |
 | `config.env` 의 `SCAN_AT` (기본 08:00 · 13:00 · 18:00) | `auto.sh`: 스캔 → 예측 → 상태 정리 → DB. 요약은 `data/auto.log` 에 한 줄씩 |
@@ -63,7 +65,7 @@
 | `light/light.sh [on\|off\|auto [06:00 16]]` | 조명. `auto` 면 Pi 가 위 표대로 (시각 · 시간을 주면 시간표를 바꾼다). 답에 지금 상태와 까닭(`why`) |
 | `fan/fan.sh [on\|off\|auto]` | 팬. `auto` 면 Pi 가 위 표대로. 답에 지금 상태와 까닭(`why`) |
 | `water/water.sh 30` | 지금 30 mL. 한 번 최대 60 mL(넘으면 줄여서 준다), 하루 300 mL |
-| `water/water.sh schedule 09:00,18:00 25` | 날마다 그 시각에 25 mL 씩 (끄기 `schedule off`) |
+| `water/water.sh schedule 09:00,18:00 25` | 날마다 그 시각에 25 mL 씩 (끄기 `schedule off`). 서버에 이어져 있으면 쓰지 않는다 — 서버의 급수 예측과 겹친다 |
 | `water/water.sh stop` · `resume` | 비상정지: 펌프를 바로 끄고 급수를 막는다 · 풀기 |
 | `water/water.sh sec 3` · `flow 14` | 처음 한 번: 3초 돌려 컵에 받고, 1초에 나온 mL 를 알려 준다 |
 | `climate/climate.sh` | 지금 온습도 + 기록 가져오기 → `data/climate.jsonl` · `water.jsonl` · `actions.jsonl` |
@@ -184,7 +186,8 @@ nano config.env                                                 # PI1 · PI2 에
    `light/light.sh off` → `on`, `fan/fan.sh off` → `on` 에 딸깍 소리가 따라오는지, `water/water.sh sec 1` 에 펌프 릴레이가 1초만 붙는지 본다 (다르면 아래 '안 될 때'). 끝나면 `light/light.sh auto` · `fan/fan.sh auto`.
 5. 12 V 어댑터를 꽂고 `./check.sh move` — 회전판이 원점을 찾고, 조명 · 팬이 2초씩 켜진다.
    회전판은 **위에서 내려다볼 때 반시계 방향**으로 돌아야 한다(카메라 쪽 면이 카메라의 오른쪽으로 간다). 시계 방향이면 Pi ① 의 `pi/pi.env` 에서 `TURN_DIR=-1` → `sudo systemctl restart greentwin`.
-6. 펌프: 관 끝을 컵에 넣고 `water/water.sh sec 3` → 받은 양이 42 mL 면 `water/water.sh flow 14` → `water/water.sh 30` 으로 확인 → `water/water.sh schedule 09:00 25`
+6. 펌프: 관 끝을 컵에 넣고 `water/water.sh sec 3` → 받은 양이 42 mL 면 `water/water.sh flow 14` → `water/water.sh 30` 으로 확인.
+   급수 시점은 서버의 급수 예측(hub)이 정하므로 시간표(`water.sh schedule`)는 켜지 않는다. 서버 없이 돌릴 때만 `water/water.sh schedule 09:00 25`
 7. `camera/camera.sh` — 빈 화분이면 "식물이 보이지 않아요"가 정상. 식물을 올린 뒤에는 스캔 폴더의 `masks.jpg` 에서 식물만 밝게 보이는지 본다.
    Pi ② 가 아직 없으면 아래 카메라 한 대로 돈다(`notes` 에 그렇게 나온다).
 8. `foresee/foresee.sh` · `status/status.sh`
@@ -227,7 +230,7 @@ nano config.env                                                 # PI1 · PI2 에
 | `foresee/plant_d<며칠째>.ply` | 오늘 · 7 · 14 · 21 · 28일 뒤의 예상 모양 (`cloud.ply` 와 같은 좌표) |
 | `status.json` | `headline` (`level` · `title` · `detail`), `alerts[]` (`level` · `code` · `text`), `env.metrics[]` (기온 · 습도 · 포차의 값과 판정), `growth`, `water` · `light` · `fan` (지금 상태와 까닭 `why`), `actions[]` (Pi 가 스스로 한 일), `db`, `devices[]` |
 | `climate.jsonl` | 한 줄에 하나: `ts` · `temp_c` · `rh_pct` · `light`(1 켜짐) · `fan` — 10분마다, 조명이 바뀔 때 |
-| `water.jsonl` | 한 줄에 하나: `ts` · `ml` · `sec` · `by` (`manual` 직접 · `schedule` 시간표 · `auto` Pi 가 판단 · `test` 유량 재기) |
+| `water.jsonl` | 한 줄에 하나: `ts` · `ml` · `sec` · `by` (`manual` 직접 · `dashboard` 대시보드 · 서버 명령 · `schedule` 시간표 · `auto` 덥고 건조해서 한 번 더 · `fallback` 24시간 비상 급수 · `test` 유량 재기) |
 | `actions.jsonl` | Pi ① 이 스스로 판단해서 한 일: `ts` · `what` (`light` · `fan` · `water`) · `text` (화면에 그대로 보여 줄 문장) |
 
 판정 등급은 `good` 좋음 · `info` 알림 · `warning` 주의 · `serious` 경고 · `critical` 위험. 기준(기온 18~29 °C, 습도 40~70 %, 포차 0.5~1.5 kPa)은
