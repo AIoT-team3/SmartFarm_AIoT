@@ -150,7 +150,7 @@ def get_growth(plant_id: int, model_id: int | None, origin_scan_id: UUID | None)
 
             cur.execute(
                 """
-                SELECT model_id, regime_start, anomaly_streak, updated_at, posterior->'harvest' AS harvest
+                SELECT model_id, regime_start, anomaly_streak, updated_at, posterior->'harvest' AS harvest, posterior->'watering' AS watering
                 FROM growth_state
                 WHERE plant_id = %s
                 """,
@@ -158,6 +158,7 @@ def get_growth(plant_id: int, model_id: int | None, origin_scan_id: UUID | None)
             )
             growth_state = cur.fetchone()
             harvest = _harvest(growth_state.pop("harvest") if growth_state else None)
+            watering = growth_state.pop("watering") if growth_state else None
     except psycopg.OperationalError as exc:
         raise APIError(503, "STORAGE_UNAVAILABLE", "DB에 일시적으로 접근할 수 없습니다.") from exc
     except psycopg.Error as exc:
@@ -172,4 +173,5 @@ def get_growth(plant_id: int, model_id: int | None, origin_scan_id: UUID | None)
         "backtest_summary": summary,
         "growth_state": growth_state,
         "harvest": harvest,
+        "watering": watering,
     }
