@@ -237,9 +237,6 @@ export function PlantScene({ future = false }: { future?: boolean }) {
           <p>이 브라우저에서 3D를 표시할 수 없어요.</p>
         </div>
       )}
-      <span className="scene-label">
-        <span className="tiny-dot" /> 임시 3D 시각화
-      </span>
       <div className="scene-controls">
         <button
           className="icon-button"
