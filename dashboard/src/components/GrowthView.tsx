@@ -1,5 +1,4 @@
 import {
-  Sprout,
   ChartNoAxesCombined,
   CalendarDays,
   CheckCheck,
@@ -32,10 +31,6 @@ export function GrowthView({
             최근 30일 스캔 관측값과 선택된 모델의 생장 예측을 함께 확인해요.
           </p>
         </div>
-        <span className="soft-pill">
-          <Sprout size={14} />
-          {growth?.model ? `생장 모델 #${growth.model.id}` : "모델 등록 대기"}
-        </span>
       </div>
       <ErrorNote message={error} />
       <div className="growth-context">

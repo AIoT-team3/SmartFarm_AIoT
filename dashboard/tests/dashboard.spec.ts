@@ -170,7 +170,7 @@ test("조회 화면·사진·예측·환경 이력을 연결하고 모바일에�
   ).toHaveCount(0);
   await expect(page.locator(".summary-metrics .metric")).toHaveCount(1);
 
-  await expect(page.getByText("임시 3D 시각화")).toBeVisible();
+  await expect(page.getByText("임시 3D 시각화")).toHaveCount(0);
   await page.getByRole("slider").fill("1");
   await expect(page.locator(".hero-reading")).toContainText("18.3");
   await expect(page.getByText("예측 평균", { exact: true })).toBeVisible();
