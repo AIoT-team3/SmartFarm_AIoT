@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from statistics import fmean
 from typing import Any
 from uuid import UUID
@@ -103,6 +103,20 @@ def _read_predictions(
     }
 
 
+def _harvest(found: Any) -> dict:
+    """growth_state.posterior 의 수확 예상 (hub 가 쓴다) → 대시보드용. 없으면 not_available."""
+    if not isinstance(found, dict) or not isinstance(found.get("date"), dict):
+        return {"status": "not_available", "estimated_date": None, "remaining_days": None}
+    try:
+        estimated = date.fromisoformat(found["date"]["p50"]) if found["date"].get("p50") else None
+    except (TypeError, ValueError):
+        return {"status": "not_available", "estimated_date": None, "remaining_days": None}
+    if estimated is None:
+        return {"status": "not_reached", "estimated_date": None, "remaining_days": None}
+    today = datetime.now(KOREA).date()
+    return {"status": "available", "estimated_date": estimated, "remaining_days": max(0, (estimated - today).days)}
+
+
 def get_growth(plant_id: int, model_id: int | None, origin_scan_id: UUID | None) -> dict:
     predictions = []
     summary = {
@@ -136,13 +150,14 @@ def get_growth(plant_id: int, model_id: int | None, origin_scan_id: UUID | None)
 
             cur.execute(
                 """
-                SELECT model_id, regime_start, anomaly_streak, updated_at
+                SELECT model_id, regime_start, anomaly_streak, updated_at, posterior->'harvest' AS harvest
                 FROM growth_state
                 WHERE plant_id = %s
                 """,
                 (plant_id,),
             )
             growth_state = cur.fetchone()
+            harvest = _harvest(growth_state.pop("harvest") if growth_state else None)
     except psycopg.OperationalError as exc:
         raise APIError(503, "STORAGE_UNAVAILABLE", "DB에 일시적으로 접근할 수 없습니다.") from exc
     except psycopg.Error as exc:
@@ -156,5 +171,5 @@ def get_growth(plant_id: int, model_id: int | None, origin_scan_id: UUID | None)
         "predictions": predictions,
         "backtest_summary": summary,
         "growth_state": growth_state,
-        "harvest": {"status": "not_available", "estimated_date": None, "remaining_days": None},
+        "harvest": harvest,
     }
