@@ -203,8 +203,9 @@ class Link:
         by = r.get("by", "manual")
         item = {"id": self.rid("water", r["ts"], by), "plant_id": self.plant, "ts": self.utc(r["ts"]), "kind": "water",
                 "amount": float(r.get("ml") or 0), "unit": "mL", "ok": not r.get("skipped"),
-                "source": "auto" if by in ("schedule", "auto") else "manual",
+                "source": "auto" if by in ("schedule", "auto", "fallback") else "manual",
                 "reason": r.get("skipped") or {"schedule": "급수 시간표", "auto": "덥고 건조해서 한 번 더", "test": "유량 재기 (화분에 준 물 아님)",
+                                               "fallback": "24시간 동안 급수가 없어 비상 급수",
                                                "dashboard": "대시보드 명령"}.get(by, "직접 줌"),
                 "context": {"by": by, **({"sec": r["sec"]} if r.get("sec") is not None else {})}}
         return item
