@@ -67,3 +67,4 @@ class GrowthResponse(BaseModel):
     backtest_summary: BacktestSummary
     growth_state: GrowthState | None
     harvest: HarvestEstimate
+    watering: dict | None = None
