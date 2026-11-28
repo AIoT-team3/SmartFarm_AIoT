@@ -135,7 +135,14 @@ function createPlant() {
   return plant;
 }
 
-export function PlantScene({ future = false }: { future?: boolean }) {
+export function PlantScene({
+  future = false,
+  day = 1,
+}: {
+  future?: boolean;
+  day?: number;
+}) {
+  const growthDay = Math.max(1, Math.min(28, Math.floor(day)));
   const host = useRef<HTMLDivElement>(null);
   const reset = useRef<() => void>(() => {});
   const [unavailable, setUnavailable] = useState(false);
@@ -267,7 +274,7 @@ export function PlantScene({ future = false }: { future?: boolean }) {
           <Leaf size={13} />
         </span>
         <span>
-          예시 식물 모델
+          {growthDay}일차
           <span className="caption-sub">
             실측·예측 수치는 오른쪽에서 확인해요
           </span>

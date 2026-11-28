@@ -171,7 +171,11 @@ test("조회 화면·사진·예측·환경 이력을 연결하고 모바일에�
   await expect(page.locator(".summary-metrics .metric")).toHaveCount(1);
 
   await expect(page.getByText("임시 3D 시각화")).toHaveCount(0);
+  await expect(page.locator(".scene-caption")).toContainText("1일차");
+  await expect(page.locator(".scene-caption")).toContainText("실측·예측 수치는 오른쪽에서 확인해요");
+  await expect(page.locator(".scene-caption")).not.toContainText("파 다시 키우기");
   await page.getByRole("slider").fill("1");
+  await expect(page.locator(".scene-caption")).toContainText("2일차");
   await expect(page.locator(".hero-reading")).toContainText("18.3");
   await expect(page.getByText("예측 평균", { exact: true })).toBeVisible();
   await page
@@ -211,6 +215,7 @@ test("조회 화면·사진·예측·환경 이력을 연결하고 모바일에�
     page.getByRole("heading", { name: "키", exact: true }),
   ).toBeVisible();
   await expect(page.locator(".growth-chart")).toHaveCount(1);
+  await expect(page.getByText(/기준 스캔/)).toHaveCount(0);
   await expect(
     page.getByText("아직 기다리고 있어요", { exact: true }),
   ).toBeVisible();

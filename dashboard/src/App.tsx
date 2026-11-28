@@ -175,6 +175,10 @@ export default function App() {
     frames.find((frame) => frame.key === `scan:${latestScan?.id}`) ||
     frames[0];
   const future = !!chosen?.prediction;
+  const visualGrowthDay = Math.max(
+    1,
+    Math.min(28, (chosen?.day ?? 0) - (frames[0]?.day ?? 0) + 1),
+  );
   const day = record ? growthDay(record.plant.sown_at) : null;
   const connected = !!record && !overview.error;
   const sensorAge = record?.latest_sensor
@@ -401,7 +405,7 @@ export default function App() {
                       </div>
                     }
                   >
-                    <PlantScene future={future} />
+                    <PlantScene future={future} day={visualGrowthDay} />
                   </Suspense>
                 </div>
                 <div className="timeline-card">
