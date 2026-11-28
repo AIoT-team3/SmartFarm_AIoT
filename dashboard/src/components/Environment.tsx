@@ -7,7 +7,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import type { Actuation, Overview, SensorReading } from "../types";
-import { dateTime, number, wateringLabel } from "../format";
+import { dateTime, deviceLabel, number, wateringLabel } from "../format";
 import { SensorChart } from "./Charts";
 import { Empty, ErrorNote } from "./UI";
 
@@ -185,7 +185,7 @@ export function Environment({
           <p>장비에서 마지막으로 확인된 적용 설정이에요.</p>
           <dl>
             <dt>설정 보고 장비</dt>
-            <dd>{overview?.settings?.device_name || "—"}</dd>
+            <dd>{overview?.settings?.device_name ? deviceLabel(overview.settings.device_name) : "—"}</dd>
             <dt>적용 버전</dt>
             <dd>
               {overview?.settings

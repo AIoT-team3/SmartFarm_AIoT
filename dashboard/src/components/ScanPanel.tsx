@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Camera, Download, Maximize2 } from "lucide-react";
 import type { Scan, ScanDetail } from "../types";
-import { dateTime, number, statusLabel } from "../format";
+import { dateTime, deviceLabel, number, statusLabel } from "../format";
 import { fileUrl } from "../api";
 import { Empty, ErrorNote, Modal } from "./UI";
 
@@ -70,7 +70,7 @@ export function ScanPanel({
                 <option value="all">모든 카메라</option>
                 {cameras.map((cam) => (
                   <option key={cam} value={cam}>
-                    {cam}
+                    {deviceLabel(cam)}
                   </option>
                 ))}
               </select>
@@ -85,14 +85,14 @@ export function ScanPanel({
                       className="photo"
                       disabled={!url}
                       onClick={() => setOpened(url)}
-                      aria-label={`${image.cam} 순번 ${image.angle_idx} 사진 확대`}
+                      aria-label={`${deviceLabel(image.cam)} 순번 ${image.angle_idx} 사진 확대`}
                     >
                       {url ? (
                         <img
                           key={url}
                           src={url}
                           loading="lazy"
-                          alt={`${image.cam}, 각도 순번 ${image.angle_idx}`}
+                          alt={`${deviceLabel(image.cam)}, 각도 순번 ${image.angle_idx}`}
                           onError={(event) => {
                             event.currentTarget.style.visibility = "hidden";
                             event.currentTarget.parentElement?.classList.add(
@@ -104,8 +104,7 @@ export function ScanPanel({
                         <span>사진 경로 없음</span>
                       )}
                       <span className="photo-caption">
-                        {image.cam}
-                        <span>#{image.angle_idx}</span>
+                        {deviceLabel(image.cam)}
                       </span>
                       <Maximize2 className="photo-expand" size={15} />
                     </button>
