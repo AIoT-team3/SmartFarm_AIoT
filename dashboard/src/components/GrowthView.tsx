@@ -45,9 +45,6 @@ export function GrowthView({
         <span>
           <span className="legend-band" />키 예측 80% 구간
         </span>
-        <span className="context-date">
-          기준 스캔 · {dateTime(growth?.origin_scan?.ts, true)}
-        </span>
       </div>
       {growth?.status === "no_model" && (
         <div className="info-note">
