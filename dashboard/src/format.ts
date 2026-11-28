@@ -1,3 +1,5 @@
+export const deviceLabel = (name: string) => name.replace(/^demo[\s_-]*/i, "");
+
 export const number = (value: number | null | undefined, digits = 1) =>
   value == null || !Number.isFinite(value)
     ? "—"

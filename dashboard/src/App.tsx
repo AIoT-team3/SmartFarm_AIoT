@@ -14,7 +14,6 @@ import {
   RefreshCw,
   ScanLine,
   Settings2,
-  ShieldCheck,
   Sprout,
   Thermometer,
   Wifi,
@@ -40,6 +39,7 @@ import type {
 } from "./types";
 import {
   clock,
+  deviceLabel,
   dateTime,
   growthDay,
   number,
@@ -182,11 +182,6 @@ export default function App() {
       Math.max(0, (Date.now() - (overview.updated || Date.now())) / 1000)
     : null;
   const staleSensor = sensorAge != null && sensorAge > 300;
-  const openAction = (kind: "scan_now" | "estop") => {
-    setAction({ kind, requestId: crypto.randomUUID(), plant: plantId });
-    setPassword("");
-    setActionError(null);
-  };
   const submitCommand = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!action || sending) return;
@@ -487,7 +482,7 @@ export default function App() {
                           ? "아직 미도달"
                           : "준비 중"
                     }
-                    note="키 25cm 이상 기준"
+                    note="키 24cm 이상 기준"
                   />
                 </div>
                 <div className="summary-section-heading">
@@ -602,13 +597,6 @@ export default function App() {
                 <h1>사진 한 장씩, 생장의 기록</h1>
                 <p>카메라별 사진과 스캔에서 얻은 측정값을 확인해요.</p>
               </div>
-              <button
-                className="button secondary"
-                onClick={() => openAction("scan_now")}
-              >
-                <ScanLine size={15} />
-                지금 스캔
-              </button>
             </div>
             <ErrorNote message={scans.error} />
             <ScanPanel
@@ -628,10 +616,6 @@ export default function App() {
                 <h1>작은 재배실의 연결 상태</h1>
                 <p>장비가 마지막으로 보고한 연결 상태를 확인해요.</p>
               </div>
-              <span className="soft-pill">
-                <ShieldCheck size={14} />
-                장비 보고 기준
-              </span>
             </div>
             <div className="device-grid">
               {record?.devices.length ? (
@@ -656,7 +640,7 @@ export default function App() {
                             : "상태 미확인"}
                       </span>
                     </div>
-                    <h2>{device.name}</h2>
+                    <h2>{deviceLabel(device.name)}</h2>
                     <p>{device.role}</p>
                     <dl>
                       <dt>마지막 보고</dt>

@@ -100,9 +100,6 @@ export function GrowthView({
               note={`구간 채점 ${summary?.band_evaluated_count ?? 0}건`}
             />
           </div>
-          <p className="footnote">
-            현재 화면의 기준 스캔·모델에 연결된 채점만 집계해요.
-          </p>
         </section>
         <section className="card">
           <div className="card-heading">
@@ -120,10 +117,10 @@ export function GrowthView({
           <p className="muted">
             {growth?.harvest.status === "available"
               ? growth.harvest.remaining_days === 0
-                ? "키 25cm 기준을 충족해 수확할 수 있어요."
-                : `${growth.harvest.remaining_days ?? "—"}일 뒤 · 키 25cm 이상 예상`
+                ? "키 24cm 기준을 충족해 수확할 수 있어요."
+                : `${growth.harvest.remaining_days ?? "—"}일 뒤 · 키 24cm 이상 예상`
               : growth?.harvest.status === "not_reached"
-                ? "저장된 예측 범위에서 키 25cm에 아직 도달하지 않았어요."
+                ? "저장된 예측 범위에서 키 24cm에 아직 도달하지 않았어요."
                 : "수확 기준과 계산 결과가 준비되면 표시돼요."}
           </p>
         </section>

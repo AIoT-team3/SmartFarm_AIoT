@@ -18,10 +18,10 @@ const overview = {
     rh_pct: 61.2,
   },
   devices: [
-    { name: "edge", role: "control", online: true, ts: now, age_seconds: 10 },
+    { name: "demo-edge", role: "control", online: true, ts: now, age_seconds: 10 },
   ],
   settings: {
-    device_name: "edge",
+    device_name: "demo-edge",
     settings_revision: 1,
     settings_applied_at: now,
     applied_settings: { watering_mode: "predictive" },
@@ -122,7 +122,7 @@ async function api(page: Page, options: { empty?: boolean } = {}) {
         images: [
           {
             id: 1,
-            cam: "cam0",
+            cam: "demo-cam0",
             angle_idx: 0,
             url: `/files/${scanId}/photo.png`,
             mask_url: null,
@@ -191,6 +191,9 @@ test("조회 화면·사진·예측·환경 이력을 연결하고 모바일에�
     .getByRole("button", { name: "스캔", exact: true })
     .click();
   await expect(page.locator(".scan-main .metric")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "지금 스캔", exact: true })).toHaveCount(0);
+  await expect(page.locator(".photo-caption")).toHaveText("cam0");
+  await expect(page.getByRole("option", { name: "cam0", exact: true })).toHaveAttribute("value", "demo-cam0");
   await page.getByRole("button", { name: "cam0 순번 0 사진 확대" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.getByRole("button", { name: "닫기", exact: true }).click();
@@ -216,6 +219,8 @@ test("조회 화면·사진·예측·환경 이력을 연결하고 모바일에�
     .getByRole("button", { name: "장비", exact: true })
     .click();
   await expect(page.getByText("온라인 보고", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "edge", exact: true })).toBeVisible();
+  await expect(page.getByText("장비 보고 기준", { exact: true })).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "이번에 요청한 명령", exact: true }),
   ).toHaveCount(0);
@@ -274,54 +279,7 @@ test("서버 오류와 빈 결과를 표시하고 화분 변경 시 이전 값�
   await expect(page.getByText("메인 바질", { exact: true })).toHaveCount(0);
 });
 
-test("명령 실패 재시도에 같은 UUID를 사용하고 장비 보고 후 완료로 표시한다", async ({
-  page,
-}) => {
-  await api(page);
-  const requests: { request_id: string; kind: string }[] = [];
-  const result = {
-    id: 9,
-    plant_id: 1,
-    kind: "scan_now",
-    status: "done",
-    request_id: "same",
-    created_at: now,
-    done_at: now,
-    result: { message: "촬영 완료" },
-  };
-  await page.route("**/api/v1/commands", async (route) => {
-    requests.push(route.request().postDataJSON());
-    if (requests.length === 1)
-      await route.fulfill({
-        status: 503,
-        json: { error: { message: "다시 시도해 주세요." } },
-      });
-    else
-      await route.fulfill({
-        status: 201,
-        json: { ...result, status: "pending", result: null },
-      });
-  });
-  await page.route("**/api/v1/commands/9", (route) =>
-    route.fulfill({ json: result }),
-  );
-  await page.goto("/");
-  await page.getByRole("navigation").getByRole("button", { name: "스캔", exact: true }).click();
-  await page.getByRole("button", { name: "지금 스캔", exact: true }).click();
-  await page.getByLabel("명령 비밀번호").fill("test-only");
-  await page.getByRole("button", { name: "스캔 요청 보내기" }).click();
-  await expect(page.getByText("다시 시도해 주세요.")).toBeVisible();
-  await page.getByRole("button", { name: "스캔 요청 보내기" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(page.getByText(/스캔 요청 #9 · 완료/)).toBeVisible();
-  expect(requests[0].request_id).toBe(requests[1].request_id);
-  expect(requests[0].kind).toBe("scan_now");
-  expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain(
-    "test-only",
-  );
-});
-
-test("25cm 수확 기준을 충족하면 현재 수확 가능 상태를 표시한다", async ({ page }) => {
+test("24cm 수확 기준을 충족하면 현재 수확 가능 상태를 표시한다", async ({ page }) => {
   await api(page);
   await page.route("**/api/v1/plants/1/growth", (route) => route.fulfill({ json: {
     ...growth,
@@ -329,7 +287,7 @@ test("25cm 수확 기준을 충족하면 현재 수확 가능 상태를 표시�
   } }));
   await page.goto("/");
   await expect(page.locator(".summary-metrics")).toContainText("지금 가능");
-  await expect(page.locator(".summary-metrics")).toContainText("25cm");
+  await expect(page.locator(".summary-metrics")).toContainText("24cm");
   await page.getByRole("navigation").getByRole("button", { name: "생장", exact: true }).click();
-  await expect(page.getByText("키 25cm 기준을 충족해 수확할 수 있어요.", { exact: true })).toBeVisible();
+  await expect(page.getByText("키 24cm 기준을 충족해 수확할 수 있어요.", { exact: true })).toBeVisible();
 });
